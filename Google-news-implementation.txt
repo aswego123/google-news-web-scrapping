@@ -1,0 +1,84 @@
+✅ Playwright works — concept is proven
+✅ Real publisher URLs are resolvable from your machine
+⚠️ ~70-80% success rate expected (some sites have consent gates)
+
+Sure! Here's the complete summary:
+
+---
+
+**What we know for sure:**
+- Google News RSS gives redirect URLs, not real article URLs
+- Static HTTP requests can never resolve them — JS execution is required
+- Playwright Java can do this natively inside Spring Boot — no sidecar needed
+
+---
+
+**What to add to `RssFeedScraper.java`:**
+
+**Step 1 — Add Playwright dependency to `pom.xml`:**
+```xml
+<dependency>
+    <groupId>com.microsoft.playwright</groupId>
+    <artifactId>playwright</artifactId>
+    <version>1.44.0</version>
+</dependency>
+```
+
+**Step 2 — Install Chromium once on the server:**
+```bash
+mvn exec:java -e -D exec.mainClass=com.microsoft.playwright.CLI -D exec.args="install chromium"
+```
+
+**Step 3 — Add this method to `RssFeedScraper.java`:**
+```java
+private String resolveGoogleNewsRedirect(String googleUrl) {
+    if (!googleUrl.startsWith("https://news.google.com")) {
+        return googleUrl; // not a google URL, skip
+    }
+    try (Playwright playwright = Playwright.create()) {
+        Browser browser = playwright.chromium().launch(
+            new BrowserType.LaunchOptions().setHeadless(true)
+        );
+        Page page = browser.newPage();
+        page.navigate(googleUrl);
+        page.waitForURL(
+            url -> !url.startsWith("https://news.google.com"),
+            new Page.WaitForURLOptions().setTimeout(30000)
+        );
+        String realUrl = page.url();
+        browser.close();
+        return realUrl;
+    } catch (Exception e) {
+        log.warn("Could not resolve Google News URL, using original: {}", googleUrl);
+        return googleUrl; // fallback — never fail, just use google URL
+    }
+}
+```
+
+**Step 4 — Wire it into `buildFeedItem()`:**
+```java
+String articleUrl = entry.getLink();
+
+// If Google News redirect, resolve to real URL first
+if (articleUrl.contains("news.google.com")) {
+    articleUrl = resolveGoogleNewsRedirect(articleUrl);
+}
+
+// Then do normal Jsoup fetch on the real URL
+Document doc = Jsoup.connect(articleUrl).get();
+```
+
+---
+
+**Expected behaviour after this:**
+
+| Scenario | Result |
+|---|---|
+| Normal RSS feed (TechCrunch, BBC) | Unchanged — `resolveGoogleNewsRedirect` skips it |
+| Google News — redirect works | Real publisher URL stored in Mongo + full article body |
+| Google News — times out (consent gate) | Falls back to Google URL, title-only stored — no crash |
+
+---
+
+**One server requirement:**
+Chromium needs to be installed on the LTTS server where AgenticIQ runs. Worth checking with your infra team if that's allowed before starting the Java implementation.

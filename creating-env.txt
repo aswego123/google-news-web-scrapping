@@ -1,0 +1,46 @@
+Here's how to set up a virtual environment and run your script:
+
+**1. Create a virtual environment** (do this once in your project folder):
+```bash
+cd /home/anjali/Downloads/AgenticIQ-bk-linux/google-news-poc
+python -m venv venv
+```
+
+**2. Activate it:**
+```bash
+source venv/bin/activate
+```
+Your prompt will change to show `(venv)` — this means you're inside the env.
+
+**3. Install dependencies:**
+```bash
+pip install feedparser requests
+```
+
+**4. Run your script:**
+```bash
+python google-news-script.py
+```
+
+**5. Deactivate when done:**
+```bash
+deactivate
+```
+
+---
+
+**Tip — save dependencies to a file** so you (or others) can reinstall them later in one shot:
+```bash
+pip freeze > requirements.txt       # saves installed packages
+pip install -r requirements.txt     # reinstalls from that file
+```
+
+---
+
+**Next time you return to this project**, just:
+```bash
+source venv/bin/activate            # activate env
+python google-news-script.py        # run script
+```
+
+The key idea: the `venv` folder is isolated packages you install inside it don't affect your system Python or other projects.
